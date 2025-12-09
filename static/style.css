@@ -53,3 +53,26 @@ footer {
     color: #aaa;
     font-size: 14px;
 }
+/* Drag & Drop Upload Box */
+.dropzone {
+    margin: 30px auto;
+    padding: 40px;
+    width: 60%;
+    text-align: center;
+    border: 2px dashed #3d6df2;
+    border-radius: 12px;
+    cursor: pointer;
+    background: #2a2a2a;
+    transition: 0.2s;
+}
+
+.dropzone p {
+    font-size: 18px;
+    color: #ccc;
+}
+
+.dropzone.dragover {
+    background: #3d6df233;
+    border-color: #6f8aff;
+    transform: scale(1.02);
+}

@@ -1,13 +1,63 @@
 {% extends "base.html" %}
+
 {% block content %}
 
 <h2 class="title">{{ bank_name }} Converter</h2>
 
-<form method="post" enctype="multipart/form-data" class="upload-box">
-    <input type="file" name="pdf" required>
-    <button type="submit" class="btn upload-btn">Convert</button>
-</form>
+<div id="dropzone" class="dropzone">
+    <p>Drag & Drop PDF here<br>or click to browse</p>
+
+    <form id="uploadForm" method="post" enctype="multipart/form-data">
+        <input type="file" id="fileInput" name="pdf" accept="application/pdf" required hidden>
+        <button type="submit" class="btn upload-btn">Convert</button>
+    </form>
+</div>
 
 <a class="back-link" href="/">⬅ Back to Home</a>
+
+<script>
+// --- DRAG & DROP LOGIC ---
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const form = document.getElementById("uploadForm");
+
+// Clicking dropzone opens file dialog
+dropzone.addEventListener("click", () => fileInput.click());
+
+// File selected manually
+fileInput.addEventListener("change", () => {
+    if (fileInput.files.length > 0) {
+        form.submit();
+    }
+});
+
+// Drag over
+dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.classList.add("dragover");
+});
+
+// Drag leave
+dropzone.addEventListener("dragleave", () => {
+    dropzone.classList.remove("dragover");
+});
+
+// Drop
+dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+
+    // Get dropped file
+    const file = e.dataTransfer.files[0];
+
+    // Only PDF allowed
+    if (file && file.type === "application/pdf") {
+        fileInput.files = e.dataTransfer.files;
+        form.submit(); // Auto submit on drop
+    } else {
+        alert("Please upload a PDF file");
+    }
+});
+</script>
 
 {% endblock %}
