@@ -26,9 +26,7 @@ dropzone.addEventListener("click", () => fileInput.click());
 
 // File selected manually
 fileInput.addEventListener("change", () => {
-    if (fileInput.files.length > 0) {
-        form.submit();
-    }
+    // NO auto-submit now
 });
 
 // Drag over
@@ -50,10 +48,9 @@ dropzone.addEventListener("drop", (e) => {
     // Get dropped file
     const file = e.dataTransfer.files[0];
 
-    // Only PDF allowed
     if (file && file.type === "application/pdf") {
         fileInput.files = e.dataTransfer.files;
-        form.submit(); // Auto submit on drop
+        // DO NOT auto-submit
     } else {
         alert("Please upload a PDF file");
     }
