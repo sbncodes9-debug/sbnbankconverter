@@ -77,19 +77,37 @@ def extract_mashreq_data(file_bytes):
                         
                         description = " ".join(desc_parts)
 
-                        # Extract amount (second to last column, typically)
-                        amount_str = row[-2] if len(row) > 1 else ""
-                        amount_val = to_number(amount_str) if amount_str else 0.0
-
-                        # Determine if it's a deposit or withdrawal based on sign
-                        # Positive = Deposit, Negative = Withdrawal
+                        # Extract amounts: look for columns with +/- signs or numeric values
+                        # Strategy: scan columns for amounts and check for +/- indicators
+                        # Exclude last column (balance) from amount detection
                         deposits = 0.0
                         withdrawals = 0.0
                         
-                        if amount_val > 0:
-                            deposits = amount_val
-                        elif amount_val < 0:
-                            withdrawals = abs(amount_val)
+                        # Find all numeric columns (amounts) - exclude last column (balance)
+                        numeric_cols = []
+                        for idx, col in enumerate(row[:-1]):  # Skip last column (balance)
+                            col_text = str(col).strip() if col else ""
+                            if col_text:
+                                # Check for +/- sign or numeric pattern
+                                if re.match(r"^[+-]?[\d,]+\.?\d*$", col_text):
+                                    try:
+                                        val = to_number(col_text)
+                                        numeric_cols.append((idx, col_text, val))
+                                    except:
+                                        pass
+                        
+                        # Process numeric columns to find deposits and withdrawals
+                        for col_idx, col_text, val in numeric_cols:
+                            # Check for explicit +/- signs
+                            if col_text.startswith('+'):
+                                deposits = val
+                            elif col_text.startswith('-'):
+                                withdrawals = abs(val)
+                            # If no sign, use the first two numeric columns found (debit, credit pattern)
+                            elif withdrawals == 0.0 and deposits == 0.0:
+                                withdrawals = val  # First amount is withdrawal
+                            elif withdrawals > 0.0 and deposits == 0.0:
+                                deposits = val  # Second amount is deposit
 
                         rows.append({
                             "Date": date,

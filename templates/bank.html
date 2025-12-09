@@ -24,9 +24,14 @@ const form = document.getElementById("uploadForm");
 // Clicking dropzone opens file dialog
 dropzone.addEventListener("click", () => fileInput.click());
 
+// STOP the Convert button from triggering the dropzone click
+document.querySelector(".upload-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+});
+
 // File selected manually
 fileInput.addEventListener("change", () => {
-    // NO auto-submit now
+    // User will click Convert manually
 });
 
 // Drag over
@@ -45,12 +50,10 @@ dropzone.addEventListener("drop", (e) => {
     e.preventDefault();
     dropzone.classList.remove("dragover");
 
-    // Get dropped file
     const file = e.dataTransfer.files[0];
 
     if (file && file.type === "application/pdf") {
         fileInput.files = e.dataTransfer.files;
-        // DO NOT auto-submit
     } else {
         alert("Please upload a PDF file");
     }
