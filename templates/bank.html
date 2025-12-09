@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="title">{{ bank_name }} Converter</h2>
+
+<form method="post" enctype="multipart/form-data" class="upload-box">
+    <input type="file" name="pdf" required>
+    <button type="submit" class="btn upload-btn">Convert</button>
+</form>
+
+<a class="back-link" href="/">⬅ Back to Home</a>
+
+{% endblock %}

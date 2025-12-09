@@ -1,0 +1,55 @@
+body {
+    background: #1e1e1e;
+    font-family: Arial, sans-serif;
+    color: white;
+    margin: 0;
+}
+
+.container {
+    text-align: center;
+    padding: 40px;
+}
+
+.title {
+    font-size: 32px;
+    margin-bottom: 30px;
+}
+
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    max-width: 900px;
+    margin: auto;
+}
+
+.btn {
+    padding: 15px 20px;
+    background: #3d6df2;
+    text-decoration: none;
+    color: white;
+    border-radius: 8px;
+    font-size: 18px;
+    transition: 0.2s;
+}
+
+.btn:hover {
+    background: #2f56c9;
+}
+
+.upload-box {
+    margin-top: 30px;
+}
+
+.upload-btn {
+    display: block;
+    margin: 20px auto;
+}
+
+footer {
+    margin-top: 40px;
+    padding: 20px;
+    background: #111;
+    color: #aaa;
+    font-size: 14px;
+}

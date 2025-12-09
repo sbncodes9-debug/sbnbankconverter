@@ -1,0 +1,9 @@
+Flask
+pdfplumber
+pymupdf
+pandas
+python-dateutil
+pillow
+pytesseract
+openpyxl
+gunicorn
