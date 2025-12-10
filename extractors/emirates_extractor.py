@@ -65,3 +65,4 @@ def extract_emirates_data(file_bytes):
     df = df[["Date", "Withdrawals", "Deposits", "Payee", "Description", "Reference Number"]]
     return df
 
+    

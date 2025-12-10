@@ -11,6 +11,7 @@ from extractors.adcb1_extractor import extract_adcb1_data
 from extractors.adcb2_extractor import extract_adcb2_data
 from extractors.adcb_cc_extractor import extract_adcb_cc_data
 from extractors.mashreq_extractor import extract_mashreq_data
+from extractors.emirates2_extractor import extract_emirates2_data
 
 app = Flask(__name__)
 
@@ -101,6 +102,12 @@ def mashreq():
     if request.method == "POST":
         return process_bank(request, extract_mashreq_data, "mashreq_statement.xlsx")
     return render_template("bank.html", bank_name="Mashreq Bank")
+
+@app.route("/emirates2", methods=["GET", "POST"])
+def emirates2():
+    if request.method == "POST":
+        return process_bank(request, extract_emirates2_data, "emirates2_statement.xlsx")
+    return render_template("bank.html", bank_name="Emirates NBD Format 2")
 
 
 # -------------------------------------------------------------------
