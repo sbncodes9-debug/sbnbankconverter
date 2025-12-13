@@ -1,4 +1,4 @@
-import pdfplumber
+import fitz  # PyMuPDF
 import pandas as pd
 import re
 from io import BytesIO
@@ -18,11 +18,12 @@ def extract_emirates2_data(pdf_bytes):
     text_lines = []
 
     # Read PDF text
-    with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
-        for page in pdf.pages:
-            t = page.extract_text()
-            if t:
-                text_lines.extend(t.split("\n"))
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    for page in doc:
+        text = page.get_text("text")
+        text_lines.extend(text.split("\n"))
+        if t:
+            text_lines.extend(t.split("\n"))
 
     date_regex = r"^\d{2}[A-Z]{3}\d{2}"      # 02NOV25
     amount_regex = r"[\d,]+\.\d{2}"

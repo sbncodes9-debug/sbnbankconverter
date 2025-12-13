@@ -6,6 +6,7 @@
 
 <div id="dropzone" class="dropzone">
     <p>Drag & Drop PDF here<br>or click to browse</p>
+    <p id="fileName" class="file-name"></p>
 
     <form id="uploadForm" method="post" enctype="multipart/form-data">
         <input type="file" id="fileInput" name="pdf" accept="application/pdf" required hidden>
@@ -20,6 +21,7 @@
 const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileInput");
 const form = document.getElementById("uploadForm");
+const fileNameEl = document.getElementById("fileName");
 
 // Clicking dropzone opens file dialog
 dropzone.addEventListener("click", () => fileInput.click());
@@ -29,10 +31,12 @@ document.querySelector(".upload-btn").addEventListener("click", (e) => {
     e.stopPropagation();
 });
 
-// File selected manually
 fileInput.addEventListener("change", () => {
-    // User will click Convert manually
+    if (fileInput.files.length > 0) {
+        fileNameEl.textContent = "Selected: " + fileInput.files[0].name;
+    }
 });
+
 
 // Drag over
 dropzone.addEventListener("dragover", (e) => {
@@ -45,7 +49,6 @@ dropzone.addEventListener("dragleave", () => {
     dropzone.classList.remove("dragover");
 });
 
-// Drop
 dropzone.addEventListener("drop", (e) => {
     e.preventDefault();
     dropzone.classList.remove("dragover");
@@ -54,10 +57,12 @@ dropzone.addEventListener("drop", (e) => {
 
     if (file && file.type === "application/pdf") {
         fileInput.files = e.dataTransfer.files;
+        fileNameEl.textContent = "Selected: " + file.name;
     } else {
         alert("Please upload a PDF file");
     }
 });
+
 </script>
 
 {% endblock %}

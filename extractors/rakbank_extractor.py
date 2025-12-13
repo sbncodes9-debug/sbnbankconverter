@@ -43,15 +43,21 @@ def to_number(text: str) -> float:
 
 def extract_rakbank_data(file_bytes):
     """
-    Column-position extractor:
-    - Finds header positions for Date / Description / Withdrawal / Deposit
-    - Uses those x positions to slice every visual row into columns
-    - Multi-line descriptions (lines above a date) are concatenated into next transaction
+    Column-position extractor with improved description capture
     """
     rows = []
 
     with pdfplumber.open(BytesIO(file_bytes)) as pdf:
         for page in pdf.pages:
+            # Extract horizontal lines for transaction boundaries
+            lines = page.lines
+            horizontal_lines = [line for line in lines if abs(line['top'] - line['bottom']) < 2 and line['top'] > 400]
+            horizontal_lines.sort(key=lambda x: x['top'])
+            
+            # Extract all text from page for description enhancement
+            page_text = page.extract_text() or ""
+            text_lines = [line.strip() for line in page_text.split('\n') if line.strip()]
+            
             # extract words with coordinates
             words = page.extract_words(use_text_flow=True)
 
@@ -156,13 +162,40 @@ def extract_rakbank_data(file_bytes):
                 if desc_r[1] <= x < wd_r[1]:
                     return "withdrawal"
                 return "deposit"
+            
+            # Helper function to get description for a specific transaction using Y position
+            def get_description_for_transaction_at_position(target_y_position):
+                """Extract description text for a single transaction using its exact Y position"""
+                # Use a very tight range around the specific Y position - only +/- 15 pixels
+                start_y = target_y_position - 15
+                end_y = target_y_position + 15
+                
+                # Collect all text within this tight range
+                all_text_parts = []
+                for top, word_list in sorted_lines:
+                    if start_y <= top <= end_y:
+                        for w in sorted(word_list, key=lambda x: x["x0"]):
+                            text = w["text"].strip()
+                            if text and not is_arabic(text):
+                                all_text_parts.append(text)
+                
+                # Join all text and clean it
+                full_text = " ".join(all_text_parts)
+                
+                # Remove date, amounts (XXX.XX), and Cr/Dr indicators
+                full_text = re.sub(r'\d{2}-[A-Za-z]{3}-\d{4}', '', full_text)  # Remove dates
+                full_text = re.sub(r'\d{1,3}(?:,\d{3})*\.\d{2}\s*(?:Cr\.?|Dr\.?)?', '', full_text)  # Remove amounts
+                full_text = re.sub(r'\s+', ' ', full_text).strip()
+                
+                # Remove common non-description words but keep reference numbers
+                full_text = re.sub(r'\b(?:Balance|الرصيد|Deposit|الوديعة|Withdrawal|السحب)\b', '', full_text)
+                full_text = re.sub(r'\s+', ' ', full_text).strip()
+                
+                return full_text
 
             # now iterate visual rows and build transactions
             desc_lines = []   # accumulate description lines for current transaction
             current = None
-
-            # skip header rows until header_line_top if header_line_top found
-            started = False if header_line_top else True
 
             for top, word_list in sorted_lines:
                 # skip header region
@@ -201,19 +234,18 @@ def extract_rakbank_data(file_bytes):
                     # reset description buffer for new transaction
                     desc_lines = []
 
+                    # Get complete description using the exact Y position of this specific transaction
+                    line_based_description = get_description_for_transaction_at_position(top)
+                    
                     # start new transaction
                     current = {
                         "Date": parse_date(date_text),
                         "Withdrawals": 0.0,
                         "Deposits": 0.0,
                         "Payee": "",
-                        "Description": clean_text(row_cols["description"]),
+                        "Description": clean_text(line_based_description),
                         "Reference Number": ""
                     }
-                    
-                    # add inline description to accumulator
-                    if row_cols["description"].strip():
-                        desc_lines.append(clean_text(row_cols["description"]))
 
                     # parse numeric strings in withdrawal / deposit column exactly as they appear
                     wd_txt = row_cols["withdrawal"].replace("Cr.", "").replace("Dr.", "").strip()
@@ -236,42 +268,10 @@ def extract_rakbank_data(file_bytes):
                             if val <= 200000:  
                                 current["Deposits"] = val
 
-                else:
-                    # no date in this visual row → likely description continuation
-                    desc_text = row_cols["description"].strip()
-                    # ignore rows that look like page footer etc.
-                    if desc_text and not is_arabic(desc_text) and not any(k.lower() in desc_text.lower() for k in IGNORE_KEYWORDS):
-                        # accumulate description line for current transaction
-                        if current:
-                            desc_lines.append(clean_text(desc_text))
-                    
-                    # Also some pdfs put amount on separate line below description — handle that:
-                    # if withdrawal/deposit present on a non-date line, and there is a current transaction, assign amount (rare)
-                    if current:
-                        wd_txt = row_cols["withdrawal"]
-                        dp_txt = row_cols["deposit"]
-                        if wd_txt and re.search(r"-?[\d,]+\.\d{2}", wd_txt):
-                            m = re.search(r"-?[\d,]+\.\d{2}", wd_txt)
-                            current["Withdrawals"] = to_number(m.group(0))
-                        if dp_txt and re.search(r"-?[\d,]+\.\d{2}", dp_txt):
-                            m = re.search(r"-?[\d,]+\.\d{2}", dp_txt)
-                            current["Deposits"] = to_number(m.group(0))
-                    # Also some pdfs put amount on separate line below description — handle that:
-                    # if withdrawal/deposit present on a non-date line, and there is a current transaction, assign amount (rare)
-                    if current:
-                        wd_txt = row_cols["withdrawal"]
-                        dp_txt = row_cols["deposit"]
-                        if wd_txt and re.search(r"-?[\d,]+\.\d{2}", wd_txt):
-                            m = re.search(r"-?[\d,]+\.\d{2}", wd_txt)
-                            current["Withdrawals"] = to_number(m.group(0))
-                        if dp_txt and re.search(r"-?[\d,]+\.\d{2}", dp_txt):
-                            m = re.search(r"-?[\d,]+\.\d{2}", dp_txt)
-                            current["Deposits"] = to_number(m.group(0))
+                # Skip non-date rows since description is now handled by line-based extraction
 
             # after page loop, flush last current
             if current:
-                # join all accumulated description lines
-                current["Description"] = clean_text(" ".join(desc_lines)) if desc_lines else current["Description"]
                 rows.append(current)
 
     # final dataframe and column order
