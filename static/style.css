@@ -76,3 +76,64 @@ footer {
     border-color: #6f8aff;
     transform: scale(1.02);
 }
+.fire-bg {
+    font-family: 'Bebas Neue', sans-serif;
+    /* rest of your fire styles stay the same */
+}
+
+.fire-bg {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+
+    /* Tilted */
+    transform: translate(-50%, -50%) rotate(-25deg);
+
+    font-family: 'Impact', 'Bebas Neue', 'Arial Black', sans-serif;
+    font-size: 320px;
+    font-weight: 900;
+    letter-spacing: 22px;
+
+    color: #d10000;              /* Strong red */
+    opacity: 0.32;               /* MORE visible */
+
+    z-index: 0;
+    pointer-events: none;
+    user-select: none;
+
+    /* Fire glow – smooth, layered */
+    text-shadow:
+        0 0 25px rgba(255, 40, 0, 0.6),
+        0 0 50px rgba(255, 90, 0, 0.45),
+        0 0 90px rgba(255, 140, 0, 0.35),
+        0 0 140px rgba(255, 190, 0, 0.25);
+
+    /* Fire movement (slow heat motion) */
+    animation: fireHeat 14s linear infinite;
+}
+
+/* Heat-wave style motion */
+@keyframes fireHeat {
+    0% {
+        transform: translate(-50%, -50%) rotate(-25deg) scale(1);
+    }
+    25% {
+        transform: translate(-49%, -51%) rotate(-25deg) scale(1.015);
+    }
+    50% {
+        transform: translate(-51%, -49%) rotate(-25deg) scale(1.03);
+    }
+    75% {
+        transform: translate(-50.5%, -50.5%) rotate(-25deg) scale(1.015);
+    }
+    100% {
+        transform: translate(-50%, -50%) rotate(-25deg) scale(1);
+    }
+}
+
+/* Keep content above */
+.title,
+.button-grid {
+    position: relative;
+    z-index: 2;
+}

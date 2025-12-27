@@ -150,8 +150,9 @@ def extract_rakbank_data(file_bytes):
 
             date_r = (-9999, mids[0])
             desc_r = (mids[0], mids[1])
-            wd_r = (mids[1], mids[2])
-            dep_r = (mids[2], 99999)
+            wd_r = (mids[1], mids[2] - 10)  # Withdrawal column with proper boundary
+            dep_r = (mids[2], mids[2] + 85)  # Narrower deposit column to exclude balance amounts
+            balance_r = (mids[2] + 85, 99999)  # Balance column starts earlier
 
             # helper to map a word x to column
             def which_col(x):
@@ -161,7 +162,9 @@ def extract_rakbank_data(file_bytes):
                     return "description"
                 if desc_r[1] <= x < wd_r[1]:
                     return "withdrawal"
-                return "deposit"
+                if wd_r[1] <= x < dep_r[1]:
+                    return "deposit"
+                return "balance"  # Ignore balance column
             
             # Helper function to get description for a specific transaction using Y position
             def get_description_for_transaction_at_position(target_y_position):
@@ -203,7 +206,7 @@ def extract_rakbank_data(file_bytes):
                     continue
 
                 # build a map of column -> joined text for this visual row
-                row_cols = {"date": "", "description": "", "withdrawal": "", "deposit": ""}
+                row_cols = {"date": "", "description": "", "withdrawal": "", "deposit": "", "balance": ""}
                 for w in sorted(word_list, key=lambda w: w["x0"]):
                     text = w["text"].strip()
                     if not text:
@@ -212,10 +215,13 @@ def extract_rakbank_data(file_bytes):
                         # ignore tiny Arabic fragments
                         continue
                     col = which_col(float(w["x0"]))
-                    if row_cols[col]:
-                        row_cols[col] += " " + text
-                    else:
-                        row_cols[col] = text
+                    if col == "balance":  # Skip balance column completely
+                        continue
+                    if col in row_cols:
+                        if row_cols[col]:
+                            row_cols[col] += " " + text
+                        else:
+                            row_cols[col] = text
 
                 # skip rows that are clearly header/footer or junk
                 joined = " ".join(row_cols.values())
@@ -264,9 +270,8 @@ def extract_rakbank_data(file_bytes):
                         test_num = re.search(r"-?[\d,]+\.\d{2}", dp_txt)
                         if test_num:
                             val = to_number(test_num.group(0))
-                            # Ignore unrealistic large numbers (running balance)
-                            if val <= 200000:  
-                                current["Deposits"] = val
+                            # Pure column logic - no amount limits
+                            current["Deposits"] = val
 
                 # Skip non-date rows since description is now handled by line-based extraction
 

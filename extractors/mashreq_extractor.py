@@ -6,6 +6,10 @@ from dateutil.parser import parse
 
 def clean_date(text):
     try:
+        # Handle YYYY-MM-DD format (like 2021-06-24)
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', text):
+            return parse(text).strftime("%d-%m-%Y")
+        # Handle other formats with dayfirst=True
         return parse(text, dayfirst=True).strftime("%d-%m-%Y")
     except:
         return None

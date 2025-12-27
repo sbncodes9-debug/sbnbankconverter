@@ -13,6 +13,8 @@ from extractors.adcb_cc_extractor import extract_adcb_cc_data
 from extractors.mashreq_extractor import extract_mashreq_data
 from extractors.emirates2_extractor import extract_emirates2_data
 from extractors.universal_extractor import extract_universal_data
+from extractors.mashreq_format2_extractor import extract_mashreq_format2_data
+from extractors.uab_extractor import extract_uab_data
 
 
 
@@ -122,6 +124,27 @@ def otherbanks():
             "other_banks_statement.xlsx"
         )
     return render_template("bank.html", bank_name="Other Banks")
+
+@app.route("/mashreq2", methods=["GET", "POST"])
+def mashreq2():
+    if request.method == "POST":
+        return process_bank(
+            request,
+            extract_mashreq_format2_data,
+            "mashreq_format2_statement.xlsx"
+        )
+    return render_template("bank.html", bank_name="Mashreq Bank (Format 2)")
+
+
+@app.route("/uab", methods=["GET", "POST"])
+def uab():
+    if request.method == "POST":
+        return process_bank(
+            request,
+            extract_uab_data,
+            "uab_statement.xlsx"
+        )
+    return render_template("bank.html", bank_name="United Arab Bank (UAB)")
 
 
 # -------------------------------------------------------------------
