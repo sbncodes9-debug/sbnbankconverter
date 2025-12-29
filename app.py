@@ -15,6 +15,7 @@ from extractors.emirates2_extractor import extract_emirates2_data
 from extractors.universal_extractor import extract_universal_data
 from extractors.mashreq_format2_extractor import extract_mashreq_format2_data
 from extractors.uab_extractor import extract_uab_data
+from extractors.excel_extractor import extract_excel_data
 
 
 
@@ -145,6 +146,27 @@ def uab():
             "uab_statement.xlsx"
         )
     return render_template("bank.html", bank_name="United Arab Bank (UAB)")
+
+
+@app.route("/excel", methods=["GET", "POST"])
+def excel():
+    if request.method == "POST":
+        return process_excel(request)
+    return render_template("excel.html")
+
+
+# -------------------------------------------------------------------
+# EXCEL PROCESSOR
+# -------------------------------------------------------------------
+def process_excel(request):
+    file = request.files["excel"]
+    df = extract_excel_data(file.read())
+
+    output = BytesIO()
+    df.to_excel(output, index=False)
+    output.seek(0)
+
+    return send_file(output, download_name="converted_excel_statement.xlsx", as_attachment=True)
 
 
 # -------------------------------------------------------------------
