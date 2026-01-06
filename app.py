@@ -16,6 +16,7 @@ from extractors.universal_extractor import extract_universal_data
 from extractors.mashreq_format2_extractor import extract_mashreq_format2_data
 from extractors.uab_extractor import extract_uab_data
 from extractors.excel_extractor import extract_excel_data
+from extractors.adcb_statement_extractor import extract_adcb_statement_data
 
 
 
@@ -146,6 +147,17 @@ def uab():
             "uab_statement.xlsx"
         )
     return render_template("bank.html", bank_name="United Arab Bank (UAB)")
+
+
+@app.route("/adcb_statement", methods=["GET", "POST"])
+def adcb_statement():
+    if request.method == "POST":
+        return process_bank(
+            request,
+            extract_adcb_statement_data,
+            "adcb_statement_of_accounts.xlsx"
+        )
+    return render_template("bank.html", bank_name="ADCB Statement of Accounts")
 
 
 @app.route("/excel", methods=["GET", "POST"])

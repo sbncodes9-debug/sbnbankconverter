@@ -48,9 +48,8 @@ def extract_emirates_data(file_bytes):
                     debit_amt = to_float(row[3])           # Debit
                     credit_amt = to_float(row[4])          # Credit
 
-                    # Reference number from narration
-                    ref_match = re.search(r"(AE\d+)", narration)
-                    reference = ref_match.group(1) if ref_match else ""
+                    # Emirates bank doesn't have a reference number column, so leave it empty
+                    reference = ""
 
                     rows.append({
                         "Date": txn_date,                       # ✅ Transaction Date only
@@ -58,7 +57,7 @@ def extract_emirates_data(file_bytes):
                         "Withdrawals": debit_amt,               # ✅ Debit → Withdrawals
                         "Payee": "",
                         "Description": narration,               # ✅ Proper Narration
-                        "Reference Number": reference
+                        "Reference Number": reference           # ✅ Empty but column heading present
                     })
 
     df = pd.DataFrame(rows)

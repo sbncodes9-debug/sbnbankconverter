@@ -88,6 +88,8 @@ def extract_rakbank_data(file_bytes):
                             header_positions["date"] = float(w["x0"])
                         if "description" in t or "الوصف" in t:
                             header_positions["description"] = float(w["x0"])
+                        if "cheque/transaction" in t or "cheque" in t or "transaction id" in t or "معرف" in t:
+                            header_positions["reference"] = float(w["x0"])
                         if "withdrawal" in t or "السحب" in t:
                             header_positions["withdrawal"] = float(w["x0"])
                         if "deposit" in t or "الوديعة" in t:
@@ -123,13 +125,15 @@ def extract_rakbank_data(file_bytes):
 
             # build column boundaries (midpoints between header x's)
             # ensure keys exist
-            for k in ["date", "description", "withdrawal", "deposit"]:
+            for k in ["date", "description", "reference", "withdrawal", "deposit"]:
                 if k not in header_positions:
                     # set sensible defaults
                     if k == "date":
                         header_positions[k] = 40.0
                     elif k == "description":
                         header_positions[k] = 150.0
+                    elif k == "reference":
+                        header_positions[k] = 430.0  # Position it right before withdrawal column
                     elif k == "withdrawal":
                         header_positions[k] = 420.0
                     else:
@@ -143,16 +147,17 @@ def extract_rakbank_data(file_bytes):
             for i in range(len(xs) - 1):
                 mids.append((xs[i] + xs[i + 1]) / 2.0)
             # set boundaries:
-            # date: (-inf, mids[0]); description: (mids[0], mids[1]); withdrawal: (mids[1], mids[2]); deposit: (mids[2], +inf)
+            # date: (-inf, mids[0]); description: (mids[0], mids[1]); reference: (mids[1], mids[2]); withdrawal: (mids[2], mids[3]); deposit: (mids[3], +inf)
             # if less mids, fill with defaults
-            while len(mids) < 3:
-                mids.append(mids[-1] + 120 if mids else 300.0)
+            while len(mids) < 4:
+                mids.append(mids[-1] + 80 if mids else 300.0)
 
             date_r = (-9999, mids[0])
             desc_r = (mids[0], mids[1])
-            wd_r = (mids[1], mids[2] - 10)  # Withdrawal column with proper boundary
-            dep_r = (mids[2], mids[2] + 85)  # Narrower deposit column to exclude balance amounts
-            balance_r = (mids[2] + 85, 99999)  # Balance column starts earlier
+            ref_r = (mids[1], mids[2])
+            wd_r = (mids[2], mids[3] - 10)  # Withdrawal column with proper boundary
+            dep_r = (mids[3], mids[3] + 85)  # Narrower deposit column to exclude balance amounts
+            balance_r = (mids[3] + 85, 99999)  # Balance column starts earlier
 
             # helper to map a word x to column
             def which_col(x):
@@ -160,7 +165,9 @@ def extract_rakbank_data(file_bytes):
                     return "date"
                 if date_r[1] <= x < desc_r[1]:
                     return "description"
-                if desc_r[1] <= x < wd_r[1]:
+                if desc_r[1] <= x < ref_r[1]:
+                    return "reference"
+                if ref_r[1] <= x < wd_r[1]:
                     return "withdrawal"
                 if wd_r[1] <= x < dep_r[1]:
                     return "deposit"
@@ -206,7 +213,7 @@ def extract_rakbank_data(file_bytes):
                     continue
 
                 # build a map of column -> joined text for this visual row
-                row_cols = {"date": "", "description": "", "withdrawal": "", "deposit": "", "balance": ""}
+                row_cols = {"date": "", "description": "", "reference": "", "withdrawal": "", "deposit": "", "balance": ""}
                 for w in sorted(word_list, key=lambda w: w["x0"]):
                     text = w["text"].strip()
                     if not text:
@@ -244,14 +251,37 @@ def extract_rakbank_data(file_bytes):
                     line_based_description = get_description_for_transaction_at_position(top)
                     
                     # start new transaction
+                    reference_text = clean_text(row_cols["reference"]) if row_cols["reference"] else ""
+                    
+                    # Validate reference number format (letter followed by numbers like S46473717, M44139)
+                    valid_reference = ""
+                    if reference_text:
+                        # Look for pattern: Letter + 5-8 digits
+                        ref_match = re.search(r'[A-Z]\d{5,8}', reference_text)
+                        if ref_match:
+                            valid_reference = ref_match.group(0)
+                    
+                    # If no valid reference found in reference column, try to extract from description
+                    if not valid_reference and line_based_description:
+                        ref_match = re.search(r'[A-Z]\d{5,8}', line_based_description)
+                        if ref_match:
+                            valid_reference = ref_match.group(0)
+                    
                     current = {
                         "Date": parse_date(date_text),
                         "Withdrawals": 0.0,
                         "Deposits": 0.0,
                         "Payee": "",
                         "Description": clean_text(line_based_description),
-                        "Reference Number": ""
+                        "Reference Number": valid_reference  # Only use if it matches the expected pattern
                     }
+                    
+                    # Debug: Print what we captured in reference column for first few transactions
+                    if len(rows) < 5:
+                        print(f"Debug - Row {len(rows)+1}: Raw reference = '{reference_text}', Valid reference = '{valid_reference}'")
+                        print(f"Debug - Description: '{line_based_description[:50]}...'")
+                        print(f"Debug - All columns: {row_cols}")
+                        print("---")
 
                     # parse numeric strings in withdrawal / deposit column exactly as they appear
                     wd_txt = row_cols["withdrawal"].replace("Cr.", "").replace("Dr.", "").strip()

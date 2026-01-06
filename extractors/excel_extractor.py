@@ -106,6 +106,7 @@ def extract_excel_data(file_bytes):
     1. Transaction Date | Value Date | Narration | Transaction Reference | Debit | Credit | Running Balance
     2. Date | Description | Amount | Reference (single amount column)
     3. CSV format with various columns including Ref. number, Description, Date, Amount, Balance
+    4. Date | Transaction ID | Description | Withdrawal | Deposit | Balance (NEW FORMAT)
     """
     rows = []
     
@@ -145,11 +146,29 @@ def extract_excel_data(file_bytes):
                 row_values = [str(cell).lower().strip() for cell in df.iloc[i] if pd.notna(cell)]
                 row_text = ' '.join(row_values)
                 
-                # Look for the specific headers we need
+                # Look for different header patterns
+                # Original format: Transaction Date, Narration, Debit, Credit
                 if ('transaction date' in row_text and 'narration' in row_text and 
                     'debit' in row_text and 'credit' in row_text):
                     header_row_index = i
-                    print(f"Found Excel headers at row {i}")
+                    print(f"Found Excel headers (original format) at row {i}")
+                    break
+                # New format: Date, Description, Withdrawal, Deposit
+                elif ('date' in row_text and 'description' in row_text and 
+                      'withdrawal' in row_text and 'deposit' in row_text):
+                    header_row_index = i
+                    print(f"Found Excel headers (new format) at row {i}")
+                    break
+                # Alternative format: Date, Description, Transaction ID
+                elif ('date' in row_text and 'description' in row_text and 
+                      ('transaction id' in row_text or 'transaction' in row_text)):
+                    header_row_index = i
+                    print(f"Found Excel headers (transaction ID format) at row {i}")
+                    break
+                # Fallback: Just Date and Description
+                elif 'date' in row_text and 'description' in row_text:
+                    header_row_index = i
+                    print(f"Found Excel headers (basic format) at row {i}")
                     break
             
             if header_row_index is None:
@@ -173,8 +192,11 @@ def extract_excel_data(file_bytes):
         description_col = None
         reference_col = None
         ref_number_col = None
+        transaction_id_col = None
         debit_col = None
         credit_col = None
+        withdrawal_col = None
+        deposit_col = None
         amount_col = None
         
         for i, header in enumerate(headers):
@@ -203,6 +225,9 @@ def extract_excel_data(file_bytes):
             elif header_str in ['ref. number', 'ref.number', 'ref number']:
                 ref_number_col = i
                 print(f"  -> Mapped as REF. NUMBER column")
+            elif 'transaction id' in header_str or header_str in ['transaction id', 'transactionid']:
+                transaction_id_col = i
+                print(f"  -> Mapped as TRANSACTION ID column")
             elif header_str == 'reference':
                 if reference_col is None:  # Prefer "transaction reference" over "reference"
                     reference_col = i
@@ -215,6 +240,12 @@ def extract_excel_data(file_bytes):
             elif header_str == 'credit':
                 credit_col = i
                 print(f"  -> Mapped as CREDIT column")
+            elif header_str == 'withdrawal' or header_str == 'withdrawals':
+                withdrawal_col = i
+                print(f"  -> Mapped as WITHDRAWAL column")
+            elif header_str == 'deposit' or header_str == 'deposits':
+                deposit_col = i
+                print(f"  -> Mapped as DEPOSIT column")
             elif header_str == 'amount':
                 amount_col = i
                 print(f"  -> Mapped as AMOUNT column")
@@ -222,15 +253,20 @@ def extract_excel_data(file_bytes):
         # Determine the best columns to use
         final_date_col = date_col
         final_description_col = narration_col if narration_col is not None else description_col
-        final_reference_col = reference_col if reference_col is not None else ref_number_col
+        final_reference_col = (reference_col if reference_col is not None else 
+                              ref_number_col if ref_number_col is not None else 
+                              transaction_id_col)
         
         # Determine format type
         has_separate_debit_credit = debit_col is not None and credit_col is not None
+        has_withdrawal_deposit = withdrawal_col is not None and deposit_col is not None
         has_single_amount = amount_col is not None
         
         print(f"Column mapping: Date={final_date_col}, Description={final_description_col}, Reference={final_reference_col}")
         if has_separate_debit_credit:
             print(f"Format: Separate Debit/Credit columns - Debit={debit_col}, Credit={credit_col}")
+        elif has_withdrawal_deposit:
+            print(f"Format: Separate Withdrawal/Deposit columns - Withdrawal={withdrawal_col}, Deposit={deposit_col}")
         elif has_single_amount:
             print(f"Format: Single Amount column - Amount={amount_col}")
         else:
@@ -267,7 +303,7 @@ def extract_excel_data(file_bytes):
                 if final_reference_col is not None and not pd.isna(row.iloc[final_reference_col]):
                     reference = str(row.iloc[final_reference_col]).strip()
                 
-                # Get amounts - handle both formats
+                # Get amounts - handle all formats
                 withdrawals = 0.0
                 deposits = 0.0
                 
@@ -279,8 +315,16 @@ def extract_excel_data(file_bytes):
                     if credit_col is not None and not pd.isna(row.iloc[credit_col]):
                         deposits = to_number(row.iloc[credit_col])
                         
+                elif has_withdrawal_deposit:
+                    # Format 2: Separate Withdrawal and Deposit columns (NEW FORMAT)
+                    if withdrawal_col is not None and not pd.isna(row.iloc[withdrawal_col]):
+                        withdrawals = to_number(row.iloc[withdrawal_col])
+                    
+                    if deposit_col is not None and not pd.isna(row.iloc[deposit_col]):
+                        deposits = to_number(row.iloc[deposit_col])
+                        
                 elif has_single_amount:
-                    # Format 2: Single Amount column (positive = deposits, negative = withdrawals)
+                    # Format 3: Single Amount column (positive = deposits, negative = withdrawals)
                     if amount_col is not None and not pd.isna(row.iloc[amount_col]):
                         amount_value = to_number(row.iloc[amount_col])
                         if amount_value > 0:
