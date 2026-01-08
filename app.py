@@ -6,6 +6,7 @@ from extractors.emirates_extractor import extract_emirates_data
 from extractors.wio_extractor import extract_wio_data
 from extractors.rakbank_extractor import extract_rakbank_data
 from extractors.rakbank_cc_extractor import extract_rakbank_cc_data
+from extractors.pluto_extractor import extract_pluto_data
 from extractors.dib_extractor import extract_dib_data
 from extractors.misr_extractor import extract_misr_data
 from extractors.adcb1_extractor import extract_adcb1_data
@@ -76,6 +77,13 @@ def rakbank_cc():
     if request.method == "POST":
         return process_bank(request, extract_rakbank_cc_data, "rakbank_credit_card.xlsx")
     return render_template("bank.html", bank_name="RAK Bank Credit Card")
+
+
+@app.route("/pluto", methods=["GET", "POST"])
+def pluto():
+    if request.method == "POST":
+        return process_bank(request, extract_pluto_data, "pluto_statement.xlsx")
+    return render_template("bank.html", bank_name="Pluto Bank")
 
 
 @app.route("/dib", methods=["GET", "POST"])
