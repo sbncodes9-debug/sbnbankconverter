@@ -4,6 +4,14 @@ import re
 from io import BytesIO
 from datetime import datetime
 
+# Import OCR helper (comment out if OCR not available)
+try:
+    from .ocr_helper import extract_text_hybrid, clean_ocr_text
+    OCR_AVAILABLE = True
+except ImportError:
+    print("OCR not available - install pytesseract, Pillow, opencv-python")
+    OCR_AVAILABLE = False
+
 
 def clean_text(s):
     if not s:
@@ -27,15 +35,27 @@ def to_number(text):
 
 
 def extract_adcb_statement_data(file_bytes):
+    """
+    ADCB Statement of Accounts extractor with OCR support
+    """
     rows = []
 
     try:
+        # First try normal PDF text extraction
         with pdfplumber.open(BytesIO(file_bytes)) as pdf:
             full_text = ""
             for page in pdf.pages:
                 txt = page.extract_text()
                 if txt:
                     full_text += "\n" + txt
+
+        # If normal extraction failed and OCR is available, try OCR
+        if (not full_text.strip() or len(full_text.strip()) < 100) and OCR_AVAILABLE:
+            print("Normal PDF extraction insufficient, trying OCR...")
+            full_text = extract_text_hybrid(file_bytes)
+            if full_text:
+                full_text = clean_ocr_text(full_text)
+                print(f"OCR extracted {len(full_text)} characters")
 
         if not full_text.strip():
             return pd.DataFrame(columns=[

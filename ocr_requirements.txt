@@ -1,0 +1,15 @@
+# OCR Dependencies for Bank Statement Extractors
+# Add these to your main requirements.txt
+
+# Core OCR
+pytesseract==0.3.10
+Pillow==10.0.0
+opencv-python==4.8.1.78
+
+# Alternative OCR libraries (optional)
+# easyocr==1.7.0
+# paddlepaddle==2.5.1
+# paddleocr==2.7.0.3
+
+# Image processing
+numpy>=1.21.0

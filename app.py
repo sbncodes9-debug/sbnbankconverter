@@ -5,6 +5,7 @@ import pandas as pd
 from extractors.emirates_extractor import extract_emirates_data
 from extractors.wio_extractor import extract_wio_data
 from extractors.rakbank_extractor import extract_rakbank_data
+from extractors.rakbank_cc_extractor import extract_rakbank_cc_data
 from extractors.dib_extractor import extract_dib_data
 from extractors.misr_extractor import extract_misr_data
 from extractors.adcb1_extractor import extract_adcb1_data
@@ -17,6 +18,7 @@ from extractors.mashreq_format2_extractor import extract_mashreq_format2_data
 from extractors.uab_extractor import extract_uab_data
 from extractors.excel_extractor import extract_excel_data
 from extractors.adcb_statement_extractor import extract_adcb_statement_data
+from extractors.emirates_islamic_extractor import extract_emirates_islamic_data
 
 
 
@@ -67,6 +69,13 @@ def rakbank():
     if request.method == "POST":
         return process_bank(request, extract_rakbank_data, "rakbank_statement.xlsx")
     return render_template("bank.html", bank_name="RAK Bank")
+
+
+@app.route("/rakbank_cc", methods=["GET", "POST"])
+def rakbank_cc():
+    if request.method == "POST":
+        return process_bank(request, extract_rakbank_cc_data, "rakbank_credit_card.xlsx")
+    return render_template("bank.html", bank_name="RAK Bank Credit Card")
 
 
 @app.route("/dib", methods=["GET", "POST"])
@@ -158,6 +167,17 @@ def adcb_statement():
             "adcb_statement_of_accounts.xlsx"
         )
     return render_template("bank.html", bank_name="ADCB Statement of Accounts")
+
+
+@app.route("/emirates_islamic", methods=["GET", "POST"])
+def emirates_islamic():
+    if request.method == "POST":
+        return process_bank(
+            request,
+            extract_emirates_islamic_data,
+            "emirates_islamic_statement.xlsx"
+        )
+    return render_template("bank.html", bank_name="Emirates Islamic Bank")
 
 
 @app.route("/excel", methods=["GET", "POST"])

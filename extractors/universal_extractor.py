@@ -50,6 +50,120 @@ def is_fab_tabular_format(line):
     tabular_pattern = r'^\d{2}-\d{2}-\d{4}\s+\d{2}-\d{2}-\d{4}\s+.*FT\w+.*\d+\.\d{2}.*\d+\.\d{2}.*\d+\.\d{2}'
     return bool(re.search(tabular_pattern, line.strip()))
 
+def is_datetime_format(line):
+    """Check if line matches datetime format (DD/MM/YYYYHH:MM:SS DD/MM/YYYY)"""
+    # Look for pattern: DD/MM/YYYY DD/MM/YYYY followed by numbers and amounts
+    # The actual format seems to be: DD/MM/YYYY DD/MM/YYYY RefNumber Description Amount Amount Amount
+    datetime_pattern = r'^\d{2}/\d{2}/\d{4}\s+\d{2}/\d{2}/\d{4}\s+\d+\s+.*\d+\.\d{2}.*\d+\.\d{2}'
+    return bool(re.match(datetime_pattern, line.strip()))
+
+def extract_datetime_transaction(line):
+    """Extract transaction data from datetime format line"""
+    # Pattern: DD/MM/YYYY DD/MM/YYYY RefNumber Description DebitAmount CreditAmount Balance
+    # From debug: 10/12/2025 10/12/2025 29164348537 MBTRF AED75000.00 TRF 53799179695 75000 0.00
+    date_pattern = r'^(\d{2}/\d{2}/\d{4})\s+(\d{2}/\d{2}/\d{4})'
+    date_match = re.match(date_pattern, line.strip())
+    
+    if not date_match:
+        return None
+    
+    posting_date = date_match.group(2)  # Use the second date (posting date)
+    remaining_line = line[date_match.end():].strip()
+    
+    # Find all amounts at the end of the line
+    # Look for the last 2-3 numeric values (debit, credit, balance)
+    amount_pattern = r'(\d+(?:\.\d{2})?)'
+    all_amounts = re.findall(amount_pattern, remaining_line)
+    
+    debit = 0.0
+    credit = 0.0
+    
+    # The last 2-3 numbers should be debit, credit, balance
+    if len(all_amounts) >= 2:
+        try:
+            # Get the last 2 amounts as debit and credit (ignore balance)
+            potential_debit = parse_amount(all_amounts[-2])
+            potential_credit = parse_amount(all_amounts[-1])
+            
+            # Determine which is debit vs credit based on transaction type
+            # Check description keywords to determine transaction type
+            line_upper = remaining_line.upper()
+            is_withdrawal = any(keyword in line_upper for keyword in ['WDL', 'WITHDRAWAL', 'ATM', 'CHEQUE'])
+            
+            if is_withdrawal:
+                # For withdrawals, the non-zero amount is debit
+                if potential_debit and potential_debit > 0:
+                    debit = potential_debit
+                elif potential_credit and potential_credit > 0:
+                    debit = potential_credit
+            else:
+                # For deposits, the non-zero amount is credit
+                if potential_credit and potential_credit > 0:
+                    credit = potential_credit
+                elif potential_debit and potential_debit > 0:
+                    credit = potential_debit
+                
+        except (ValueError, IndexError):
+            pass
+    
+    # Extract reference and description more carefully
+    # Remove all amounts from the line to get clean text
+    text_without_amounts = remaining_line
+    for amount in all_amounts:
+        text_without_amounts = text_without_amounts.replace(amount, " ")
+    
+    # Also remove common currency codes and keywords that aren't part of description
+    text_without_amounts = re.sub(r'\bAED\d+\.\d{2}\b', ' ', text_without_amounts)  # Remove AED amounts
+    text_without_amounts = re.sub(r'\bAED\b', ' ', text_without_amounts)
+    
+    # Clean up extra spaces
+    text_without_amounts = re.sub(r'\s+', ' ', text_without_amounts).strip()
+    
+    # Split into parts
+    parts = text_without_amounts.split()
+    reference = ""
+    description_parts = []
+    
+    if parts:
+        # Look for reference number - typically a long numeric code (10+ digits)
+        for i, part in enumerate(parts):
+            if len(part) >= 10 and part.isdigit():
+                reference = part
+                # Everything else is description
+                description_parts = parts[:i] + parts[i+1:]
+                break
+        
+        # If no long reference found, look for shorter numeric codes (8+ digits)
+        if not reference:
+            for i, part in enumerate(parts):
+                if len(part) >= 8 and part.isdigit():
+                    reference = part
+                    # Everything else is description
+                    description_parts = parts[:i] + parts[i+1:]
+                    break
+        
+        # If still no reference found, use all parts as description
+        if not reference:
+            description_parts = parts
+    
+    # Join description parts and clean
+    description = ' '.join(description_parts)
+    description = clean_text(description)
+    
+    # Remove any remaining TRF keywords that aren't meaningful
+    description = re.sub(r'\bTRF\b', '', description).strip()
+    description = re.sub(r'\bMBTRF\b', '', description).strip()
+    description = re.sub(r'\s+', ' ', description).strip()
+    
+    return {
+        "Date": normalize_date(posting_date),
+        "Withdrawals": debit if debit > 0 else "",
+        "Deposits": credit if credit > 0 else "",
+        "Payee": "",
+        "Description": description.strip(),
+        "Reference Number": reference
+    }
+
 def is_standard_tabular_format(line):
     """Check if line matches standard tabular format (Posting Date | Value Date | Description | Ref/Cheque No | Debit Amount | Credit Amount | Balance)"""
     # Look for pattern: DD/MM/YYYY DD/MM/YYYY [description] [ref] [amount] [amount] [amount]
@@ -347,8 +461,16 @@ def extract_universal_data(pdf_bytes):
                     i += 1
                     continue
                 
-                # Check if this is standard tabular format first (most specific)
-                if is_standard_tabular_format(line):
+                # Check if this is datetime format first (new format)
+                if is_datetime_format(line):
+                    datetime_transaction = extract_datetime_transaction(line)
+                    if datetime_transaction:
+                        rows.append(datetime_transaction)
+                    i += 1
+                    continue
+                
+                # Check if this is standard tabular format
+                elif is_standard_tabular_format(line):
                     # For standard tabular format, we might need to combine multiple lines for full description
                     full_line = line
                     
@@ -363,7 +485,8 @@ def extract_universal_data(pdf_bytes):
                         # If next line starts with a date, it's a new transaction
                         if (is_standard_tabular_format(next_line) or 
                             is_fab_tabular_format(next_line) or 
-                            is_fab_format(next_line)):
+                            is_fab_format(next_line) or
+                            is_datetime_format(next_line)):
                             break
                         
                         # If next line looks like a continuation (no date at start)
@@ -394,7 +517,9 @@ def extract_universal_data(pdf_bytes):
                             continue
                         
                         # If next line starts with a date, it's a new transaction
-                        if is_fab_tabular_format(next_line) or is_fab_format(next_line):
+                        if (is_fab_tabular_format(next_line) or 
+                            is_fab_format(next_line) or
+                            is_datetime_format(next_line)):
                             break
                         
                         # If next line looks like a continuation (no date at start)
@@ -425,7 +550,9 @@ def extract_universal_data(pdf_bytes):
                             continue
                         
                         # If next line starts with a date, it's a new transaction
-                        if is_fab_format(next_line) or is_fab_tabular_format(next_line):
+                        if (is_fab_format(next_line) or 
+                            is_fab_tabular_format(next_line) or
+                            is_datetime_format(next_line)):
                             break
                         
                         # If next line looks like a continuation (no date at start)
