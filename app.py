@@ -9,8 +9,6 @@ from extractors.rakbank_cc_extractor import extract_rakbank_cc_data
 from extractors.pluto_extractor import extract_pluto_data
 from extractors.dib_extractor import extract_dib_data
 from extractors.misr_extractor import extract_misr_data
-from extractors.adcb1_extractor import extract_adcb1_data
-from extractors.adcb2_extractor import extract_adcb2_data
 from extractors.adcb_cc_extractor import extract_adcb_cc_data
 from extractors.mashreq_extractor import extract_mashreq_data
 from extractors.emirates2_extractor import extract_emirates2_data
@@ -104,14 +102,14 @@ def misr():
 @app.route("/adcb1", methods=["GET", "POST"])
 def adcb1():
     if request.method == "POST":
-        return process_bank(request, extract_adcb1_data, "adcb_format1.xlsx")
+        return process_bank(request, extract_adcb_statement_data, "adcb_format1.xlsx")
     return render_template("bank.html", bank_name="ADCB Format 1")
 
 
 @app.route("/adcb2", methods=["GET", "POST"])
 def adcb2():
     if request.method == "POST":
-        return process_bank(request, extract_adcb2_data, "adcb_format2.xlsx")
+        return process_bank(request, extract_adcb_statement_data, "adcb_format2.xlsx")
     return render_template("bank.html", bank_name="ADCB Format 2")
 
 
@@ -172,9 +170,9 @@ def adcb_statement():
         return process_bank(
             request,
             extract_adcb_statement_data,
-            "adcb_statement_of_accounts.xlsx"
+            "adcb_statement.xlsx"
         )
-    return render_template("bank.html", bank_name="ADCB Statement of Accounts")
+    return render_template("bank.html", bank_name="ADCB Bank")
 
 
 @app.route("/emirates_islamic", methods=["GET", "POST"])
