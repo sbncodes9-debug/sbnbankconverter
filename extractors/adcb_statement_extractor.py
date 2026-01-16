@@ -231,33 +231,43 @@ def extract_adcb2_format(file_bytes):
                         if not date:
                             continue
 
-                        # Extract description and reference from middle columns
-                        desc_parts = []
-                        ref = ""
+                        # Extract Bank Reference, Customer Reference, and Description
+                        # Columns: 2=Value Date, 3=Bank Ref, 4=Customer Ref, 5=Description
+                        bank_ref = ""
+                        customer_ref = ""
+                        description = ""
                         
-                        # Look at columns 2-5 for references and description
-                        for col_idx in range(2, min(6, len(row))):
-                            if not row[col_idx] or not str(row[col_idx]).strip():
-                                continue
-                            
-                            col_text = str(row[col_idx]).strip()
-                            
-                            # Skip value dates (pattern: DD-MMM-YYYY)
-                            if re.match(r"^\d{2}-[A-Za-z]{3}-\d{4}$", col_text):
-                                continue
-                            
-                            # Extract reference number (bank reference or customer reference)
-                            if re.search(r"\d{8,}", col_text) and not ref:
-                                # Capture the longest digit sequence as reference
-                                matches = re.findall(r"\d{8,}", col_text)
-                                if matches:
-                                    ref = matches[0]
-                            
-                            # Add to description if it contains meaningful text
-                            if col_text and not re.match(r"^[\d\s\.\-]+$", col_text):
-                                desc_parts.append(col_text)
+                        # Column 3: Bank Reference (alphanumeric like PHUB48349, CHRG49006, etc.)
+                        if len(row) > 3 and row[3]:
+                            bank_ref_text = str(row[3]).strip()
+                            # Skip if it's a date
+                            if not re.match(r"^\d{2}-[A-Za-z]{3}-\d{4}$", bank_ref_text):
+                                bank_ref = bank_ref_text
                         
-                        description = " ".join(desc_parts)
+                        # Column 4: Customer Reference (numeric like 2025052901, 228111, etc.)
+                        if len(row) > 4 and row[4]:
+                            customer_ref_text = str(row[4]).strip()
+                            # Skip if it's a date
+                            if not re.match(r"^\d{2}-[A-Za-z]{3}-\d{4}$", customer_ref_text):
+                                customer_ref = customer_ref_text
+                        
+                        # Column 5: Description
+                        if len(row) > 5 and row[5]:
+                            description = str(row[5]).strip()
+                        
+                        # Combine references - prefer Bank Reference, fallback to Customer Reference
+                        if bank_ref and customer_ref:
+                            # If both exist, use Bank Reference and add Customer Reference if it's different
+                            ref = bank_ref
+                            # Only add customer ref if it's not already in bank ref
+                            if customer_ref not in bank_ref and re.match(r'^\d+$', customer_ref):
+                                ref = f"{bank_ref} {customer_ref}"
+                        elif bank_ref:
+                            ref = bank_ref
+                        elif customer_ref:
+                            ref = customer_ref
+                        else:
+                            ref = ""
 
                         # Extract amounts from the last 3 columns (Debit, Credit, Balance)
                         debit = 0.0
@@ -398,13 +408,267 @@ def extract_adcb_current_format(file_bytes):
     return rows
 
 
+def extract_adcb3_format(file_bytes):
+    """Extract ADCB3 format (Account Statement with Posting Date, Value Date, Description, Ref/Cheque No, Debit, Credit, Balance)"""
+    rows = []
+
+    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+        for page in pdf.pages:
+            # Use text extraction with column positions
+            text = page.extract_text()
+            if not text:
+                continue
+            
+            lines = text.split('\n')
+            i = 0
+            
+            while i < len(lines):
+                line = lines[i]
+                line_stripped = line.strip()
+                
+                # Skip empty lines and headers
+                if not line_stripped:
+                    i += 1
+                    continue
+                if any(header in line_stripped.upper() for header in ["POSTING DATE", "VALUE DATE", "DESCRIPTION", "DEBIT AMOUNT", "CREDIT AMOUNT", "REF/CHEQUE"]):
+                    i += 1
+                    continue
+                
+                # Look for lines starting with date pattern (dd/mm/yyyy)
+                date_match = re.match(r'^(\d{2}/\d{2}/\d{4})', line_stripped)
+                if not date_match:
+                    i += 1
+                    continue
+                
+                posting_date_str = date_match.group(1)
+                date = parse_date_format1(posting_date_str)
+                if not date:
+                    i += 1
+                    continue
+                
+                # Remove the posting date from the line
+                rest_of_line = line_stripped[10:].strip()
+                
+                # Look for value date (second date)
+                value_date_match = re.match(r'^(\d{2}/\d{2}/\d{4})\s+(.+)', rest_of_line)
+                if value_date_match:
+                    rest_of_line = value_date_match.group(2).strip()
+                
+                # Collect multi-line description
+                # Check if next lines are continuation (don't start with date)
+                full_line = rest_of_line
+                j = i + 1
+                while j < len(lines):
+                    next_line = lines[j].strip()
+                    # Stop if next line starts with a date (new transaction)
+                    if re.match(r'^\d{2}/\d{2}/\d{4}', next_line):
+                        break
+                    # Stop if next line is empty or a header
+                    if not next_line or any(header in next_line.upper() for header in ["POSTING DATE", "VALUE DATE", "DESCRIPTION"]):
+                        break
+                    # Stop if next line looks like a footer or page number
+                    if re.match(r'^Page \d+', next_line, re.I) or "Statement" in next_line:
+                        break
+                    # Add continuation line
+                    full_line += " " + next_line
+                    j += 1
+                
+                # Update index to skip processed continuation lines
+                i = j
+                
+                # Find all amounts in the combined line (format: X,XXX.XX or XXX.XX)
+                amounts = re.findall(r'\b\d{1,3}(?:,\d{3})*\.\d{2}\b', full_line)
+                
+                if len(amounts) < 2:
+                    continue
+                
+                # Last 3 amounts are: Debit, Credit, Balance
+                # We need Debit and Credit
+                debit_str = amounts[-3] if len(amounts) >= 3 else "0.00"
+                credit_str = amounts[-2] if len(amounts) >= 2 else "0.00"
+                balance_str = amounts[-1] if len(amounts) >= 1 else "0.00"
+                
+                debit = to_number(debit_str)
+                credit = to_number(credit_str)
+                
+                # Skip if both amounts are zero
+                if debit == 0 and credit == 0:
+                    continue
+                
+                # Extract description and reference
+                # Remove all amounts from the line to get description + reference
+                desc_and_ref = full_line
+                for amt in amounts:
+                    desc_and_ref = desc_and_ref.replace(amt, ' ')
+                
+                # Clean up spaces
+                desc_and_ref = re.sub(r'\s+', ' ', desc_and_ref).strip()
+                
+                # Extract reference number - look for patterns with priority:
+                # Priority 1: Numbers with # (e.g., 5355546#729) - most reliable
+                # Priority 2: Long digit sequences (10+ digits) that appear AFTER the first word
+                # Priority 3: Alphanumeric codes (letters + numbers)
+                
+                ref = ""
+                description = desc_and_ref
+                
+                # Pattern 1: Look for number with # (e.g., 5355546#729) - HIGHEST PRIORITY
+                ref_match = re.search(r'\b(\d+#\d+)\b', desc_and_ref)
+                if ref_match:
+                    ref = ref_match.group(1)
+                    description = desc_and_ref.replace(ref, ' ')
+                else:
+                    # Pattern 2: Look for long digit sequences (10+ digits)
+                    # But skip the first long number (likely transaction ID in description)
+                    all_long_numbers = re.findall(r'\b(\d{10,})\b', desc_and_ref)
+                    if len(all_long_numbers) > 1:
+                        # Use the LAST long number as reference (more likely to be ref number)
+                        ref = all_long_numbers[-1]
+                        description = desc_and_ref.replace(ref, ' ')
+                    elif len(all_long_numbers) == 1:
+                        # Only one long number - check if it's at the beginning (transaction ID) or later (ref)
+                        # If it appears after the first 20 characters, likely a reference
+                        ref_pos = desc_and_ref.find(all_long_numbers[0])
+                        if ref_pos > 20:
+                            ref = all_long_numbers[0]
+                            description = desc_and_ref.replace(ref, ' ')
+                        # Otherwise, leave it in description (it's a transaction ID)
+                    
+                    # Pattern 3: Look for alphanumeric patterns only if no long numbers found
+                    if not ref:
+                        ref_match = re.search(r'\b([A-Z]{2,}[0-9]{5,})\b', desc_and_ref)
+                        if ref_match:
+                            ref = ref_match.group(1)
+                            description = desc_and_ref.replace(ref, ' ')
+                
+                # Final cleanup of description
+                description = re.sub(r'\s+', ' ', description).strip()
+                
+                if not description:
+                    continue
+                
+                rows.append({
+                    "Date": date,
+                    "Withdrawals": debit if debit > 0 else "",
+                    "Deposits": credit if credit > 0 else "",
+                    "Payee": "",
+                    "Description": description,
+                    "Reference Number": ref
+                })
+
+    return rows
+
+
+def extract_adcb4_format(file_bytes):
+    """Extract ADCB4 format (Account Statement with Posting Date+Time, table-based with proper column mapping)"""
+    rows = []
+
+    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+        for page in pdf.pages:
+            tables = page.extract_tables()
+            
+            if not tables:
+                continue
+
+            for table in tables:
+                for row_idx, row in enumerate(table):
+                    if not row or len(row) < 6:
+                        continue
+
+                    # Skip header rows
+                    if any(header in str(row[0] or "").upper() for header in ["POSTING DATE", "VALUE DATE", "DESCRIPTION", "DEBIT", "CREDIT", "REF/CHEQUE"]):
+                        continue
+                    
+                    # Skip empty rows
+                    if not any(cell and str(cell).strip() for cell in row):
+                        continue
+
+                    try:
+                        # Expected columns: Posting Date | Value Date | Description | Ref/Cheque No | Debit Amount | Credit Amount | Balance
+                        # Column indices:    0           | 1          | 2           | 3            | 4           | 5             | 6
+                        
+                        posting_date_str = str(row[0]).strip() if row[0] else ""
+                        
+                        # Parse posting date - may include timestamp (dd/mm/yyyy HH-MM-SS)
+                        # Extract just the date part
+                        date_match = re.match(r'(\d{2}/\d{2}/\d{4})', posting_date_str)
+                        if not date_match:
+                            continue
+                        
+                        date = parse_date_format1(date_match.group(1))
+                        if not date:
+                            continue
+
+                        # Column 2: Description
+                        description = str(row[2]).strip() if len(row) > 2 and row[2] else ""
+                        
+                        # Column 3: Ref/Cheque No
+                        ref = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+                        
+                        # Column 4: Debit Amount (Withdrawals)
+                        debit = 0.0
+                        if len(row) > 4 and row[4] and str(row[4]).strip():
+                            debit_str = str(row[4]).strip()
+                            debit_str = re.sub(r'[^\d,.]', '', debit_str)
+                            if debit_str:
+                                debit = to_number(debit_str)
+                        
+                        # Column 5: Credit Amount (Deposits)
+                        credit = 0.0
+                        if len(row) > 5 and row[5] and str(row[5]).strip():
+                            credit_str = str(row[5]).strip()
+                            credit_str = re.sub(r'[^\d,.]', '', credit_str)
+                            if credit_str:
+                                credit = to_number(credit_str)
+
+                        # Skip rows with no amounts
+                        if debit == 0 and credit == 0:
+                            continue
+                        
+                        # Skip rows with no description
+                        if not description:
+                            continue
+
+                        rows.append({
+                            "Date": date,
+                            "Withdrawals": debit if debit > 0 else "",
+                            "Deposits": credit if credit > 0 else "",
+                            "Payee": "",
+                            "Description": clean_text(description),
+                            "Reference Number": ref
+                        })
+                        
+                    except Exception as e:
+                        print(f"Error processing ADCB4 row {row_idx}: {e}")
+                        continue
+
+    return rows
+
+
 def detect_adcb_format(file_bytes):
     """Detect which ADCB format is being used"""
     try:
         with pdfplumber.open(BytesIO(file_bytes)) as pdf:
             first_page_text = pdf.pages[0].extract_text() if pdf.pages else ""
+            first_page_upper = first_page_text.upper()
             
-            # Check for ADCB2 format FIRST (table structure with Sr No and specific headers)
+            # Check for ADCB4 format FIRST (Account Statement with Posting Date+Time)
+            # Look for date with timestamp pattern (dd/mm/yyyy HH-MM-SS or HH:MM:SS)
+            if re.search(r'\d{2}/\d{2}/\d{4}\s+\d{2}[-:]\d{2}[-:]\d{2}', first_page_text):
+                if "POSTING DATE" in first_page_upper or "VALUE DATE" in first_page_upper:
+                    print("Detected ADCB4 format: Account Statement with Posting Date+Time found")
+                    return "adcb4"
+            
+            # Check for ADCB3 format (Account Statement with Posting Date, Value Date columns)
+            # This must come before ADCB1 check since both use dd/mm/yyyy dates
+            # ADCB3 has specific English headers: "Posting Date", "Value Date", "Debit Amount", "Credit Amount"
+            if ("POSTING DATE" in first_page_upper and "VALUE DATE" in first_page_upper) or \
+               ("POSTING DATE" in first_page_upper and "REF/CHEQUE" in first_page_upper) or \
+               ("POSTING DATE" in first_page_upper and "DEBIT AMOUNT" in first_page_upper and "CREDIT AMOUNT" in first_page_upper):
+                print("Detected ADCB3 format: Account Statement with Posting Date/Value Date found")
+                return "adcb3"
+            
+            # Check for ADCB2 format (table structure with Sr No and specific headers)
             tables = pdf.pages[0].extract_tables() if pdf.pages else []
             if tables:
                 # Look for table headers that indicate ADCB2 format
@@ -415,14 +679,18 @@ def detect_adcb_format(file_bytes):
                             return "adcb2"
             
             # Also check text for ADCB2 indicators
-            if any(indicator in first_page_text.upper() for indicator in ["SR NO", "BANK REFERENCE NO", "CUSTOMER REFERENCE NO", "RUNNING BALANCE"]):
+            if any(indicator in first_page_upper for indicator in ["SR NO", "BANK REFERENCE NO", "CUSTOMER REFERENCE NO", "RUNNING BALANCE"]):
                 print("Detected ADCB2 format: Table headers found in text")
                 return "adcb2"
             
-            # Check for ADCB1 format (dd/mm/yyyy dates and specific layout)
-            if re.search(r"\d{2}/\d{2}/\d{4}", first_page_text) and "Statement of Account" not in first_page_text:
-                print("Detected ADCB1 format: dd/mm/yyyy dates found")
-                return "adcb1"
+            # Check for ADCB1 format (dd/mm/yyyy dates and Arabic layout WITHOUT Posting Date header)
+            # ADCB1 typically has Arabic text and simpler column structure
+            if re.search(r"\d{2}/\d{2}/\d{4}", first_page_text) and "POSTING DATE" not in first_page_upper:
+                # Additional check: ADCB1 often has Arabic text or simpler headers
+                if any(arabic_indicator in first_page_text for arabic_indicator in ["التاريخ", "التفاصيل", "الرصيد", "كشف الحساب"]) or \
+                   ("Statement of Account" in first_page_text and "POSTING DATE" not in first_page_upper):
+                    print("Detected ADCB1 format: dd/mm/yyyy dates with Arabic layout found")
+                    return "adcb1"
             
             # Check for current format (transaction pattern with serial numbers)
             if re.search(r"^\d+\s+\d{2}-[A-Za-z]{3}-\d{4}", first_page_text, re.M):
@@ -445,7 +713,7 @@ def detect_adcb_format(file_bytes):
 
 def extract_adcb_statement_data(file_bytes):
     """
-    Unified ADCB Statement extractor that handles all three formats
+    Unified ADCB Statement extractor that handles all five formats
     """
     # Detect format
     format_type = detect_adcb_format(file_bytes)
@@ -458,6 +726,10 @@ def extract_adcb_statement_data(file_bytes):
         rows = extract_adcb1_format(file_bytes)
     elif format_type == "adcb2":
         rows = extract_adcb2_format(file_bytes)
+    elif format_type == "adcb3":
+        rows = extract_adcb3_format(file_bytes)
+    elif format_type == "adcb4":
+        rows = extract_adcb4_format(file_bytes)
     else:  # current format
         rows = extract_adcb_current_format(file_bytes)
     
@@ -465,7 +737,13 @@ def extract_adcb_statement_data(file_bytes):
     if not rows:
         print(f"No results with {format_type} format, trying other formats...")
         
-        if format_type != "adcb1":
+        if format_type != "adcb4":
+            rows = extract_adcb4_format(file_bytes)
+        
+        if not rows and format_type != "adcb3":
+            rows = extract_adcb3_format(file_bytes)
+        
+        if not rows and format_type != "adcb1":
             rows = extract_adcb1_format(file_bytes)
         
         if not rows and format_type != "adcb2":

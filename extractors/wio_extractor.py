@@ -42,20 +42,31 @@ def extract_wio_data(file_bytes):
 
     if is_credit_statement:
         # Credit card statement parsing
-        # Pattern: Date | Ref Number | Description | Card Number | Amount
+        # Pattern: Date | Ref Number | Description | Card Number (optional) | Amount
         # Example: 13/10/2025 | P3583315453 | Withdrawal.com | ****$243 | -66.60
-        cc_line_re = re.compile(r"^(\d{2}/\d{2}/\d{4})\s+([A-Z0-9]+)\s+(.+?)\s+(\*{4}\$?\d+)\s+([+-]?[\d,]+\.?\d*)$")
+        # Or: 16/11/2025 | P343577394 | late fee | -199.00 (no card number)
         
         for line in lines:
-            m = cc_line_re.match(line)
-            if not m:
-                continue
-
-            date_raw = m.group(1)
-            ref = m.group(2)
-            desc_raw = m.group(3).strip()
-            # card_num = m.group(4)  # Optional: store card number if needed
-            amount_raw = m.group(5)
+            # Try pattern with card number first
+            cc_line_with_card = re.match(r"^(\d{2}/\d{2}/\d{4})\s+([A-Z0-9]+)\s+(.+?)\s+(\*{4}\$?\d+)\s+([+-]?[\d,]+\.?\d*)$", line)
+            
+            if cc_line_with_card:
+                date_raw = cc_line_with_card.group(1)
+                ref = cc_line_with_card.group(2)
+                desc_raw = cc_line_with_card.group(3).strip()
+                # card_num = cc_line_with_card.group(4)  # Optional: store card number if needed
+                amount_raw = cc_line_with_card.group(5)
+            else:
+                # Try pattern without card number
+                cc_line_no_card = re.match(r"^(\d{2}/\d{2}/\d{4})\s+([A-Z0-9]+)\s+(.+?)\s+([+-]?[\d,]+\.?\d*)$", line)
+                
+                if not cc_line_no_card:
+                    continue
+                
+                date_raw = cc_line_no_card.group(1)
+                ref = cc_line_no_card.group(2)
+                desc_raw = cc_line_no_card.group(3).strip()
+                amount_raw = cc_line_no_card.group(4)
 
             amt = to_float(amount_raw)
             deposit = amt if amt > 0 else 0.0
@@ -71,8 +82,8 @@ def extract_wio_data(file_bytes):
             })
     else:
         # Account statement parsing (original logic)
-        # detect start of transaction line
-        line_re = re.compile(r"^(\d{2}/\d{2}/\d{4})\s+(P\d+)\s*(.*)$")
+        # detect start of transaction line - make reference number optional
+        line_re = re.compile(r"^(\d{2}/\d{2}/\d{4})\s+(P\d+)?\s*(.*)$")
 
         for line in lines:
             m = line_re.match(line)
@@ -80,8 +91,12 @@ def extract_wio_data(file_bytes):
                 continue
 
             date_raw = m.group(1)
-            ref = m.group(2)
+            ref = m.group(2) if m.group(2) else ""  # Reference number is optional
             rest = m.group(3).strip()
+
+            # Skip if no meaningful content after date
+            if not rest:
+                continue
 
             # ✅ safe split from right
             parts = rest.rsplit(None, 2)
@@ -90,6 +105,15 @@ def extract_wio_data(file_bytes):
                 desc_raw, amount_raw, balance_raw = parts
             elif len(parts) == 2:
                 desc_raw, amount_raw = parts
+            elif len(parts) == 1:
+                # Only one part - could be description with amount embedded
+                # Try to extract amount from the end
+                amount_match = re.search(r'([+-]?[\d,]+\.?\d*)$', rest)
+                if amount_match:
+                    amount_raw = amount_match.group(1)
+                    desc_raw = rest[:amount_match.start()].strip()
+                else:
+                    continue
             else:
                 continue
 
