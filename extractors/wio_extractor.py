@@ -43,12 +43,12 @@ def extract_wio_data(file_bytes):
     if is_credit_statement:
         # Credit card statement parsing
         # Pattern: Date | Ref Number | Description | Card Number (optional) | Amount
-        # Example: 13/10/2025 | P3583315453 | Withdrawal.com | ****$243 | -66.60
-        # Or: 16/11/2025 | P343577394 | late fee | -199.00 (no card number)
+        # Amount can be negative (-25.44) or positive (+1,225.74)
         
         for line in lines:
             # Try pattern with card number first
-            cc_line_with_card = re.match(r"^(\d{2}/\d{2}/\d{4})\s+([A-Z0-9]+)\s+(.+?)\s+(\*{4}\$?\d+)\s+([+-]?[\d,]+\.?\d*)$", line)
+            # Use non-greedy match for description and explicit amount pattern
+            cc_line_with_card = re.match(r"^(\d{2}/\d{2}/\d{4})\s+([A-Z0-9]+)\s+(.+?)\s+(\*{4}[\$\d]+)\s+([+-]?[\d,]+\.?\d*)$", line)
             
             if cc_line_with_card:
                 date_raw = cc_line_with_card.group(1)
@@ -58,6 +58,7 @@ def extract_wio_data(file_bytes):
                 amount_raw = cc_line_with_card.group(5)
             else:
                 # Try pattern without card number
+                # More flexible pattern to handle various amount formats
                 cc_line_no_card = re.match(r"^(\d{2}/\d{2}/\d{4})\s+([A-Z0-9]+)\s+(.+?)\s+([+-]?[\d,]+\.?\d*)$", line)
                 
                 if not cc_line_no_card:
@@ -68,6 +69,7 @@ def extract_wio_data(file_bytes):
                 desc_raw = cc_line_no_card.group(3).strip()
                 amount_raw = cc_line_no_card.group(4)
 
+            # Parse amount - handle both positive and negative
             amt = to_float(amount_raw)
             deposit = amt if amt > 0 else 0.0
             withdrawal = abs(amt) if amt < 0 else 0.0
