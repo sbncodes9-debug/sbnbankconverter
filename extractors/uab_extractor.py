@@ -43,14 +43,14 @@ def to_number(text: str) -> float:
         return 0.0
 
 
-def extract_uab_data(file_bytes):
+def extract_uab_data(file_bytes, password=None):
     """
     Column-position extractor for UAB Bank statements
     Format: Date | Description | Debit | Credit | Balance
     """
     rows = []
 
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
         for page in pdf.pages:
             # extract words with coordinates
             words = page.extract_words(use_text_flow=True)

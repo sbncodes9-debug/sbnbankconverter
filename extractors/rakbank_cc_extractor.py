@@ -46,7 +46,7 @@ def is_credit_transaction(amount_text):
     return "Cr" in str(amount_text)
 
 
-def extract_rakbank_cc_data(file_bytes):
+def extract_rakbank_cc_data(file_bytes, password=None):
     """
     RAKBank Credit Card Statement extractor with OCR support
     Format: Date | Transaction Description | Transaction Currency | Transaction Amount | FX Rate | Total Amount(AED)
@@ -55,7 +55,7 @@ def extract_rakbank_cc_data(file_bytes):
 
     try:
         # First try normal PDF text extraction
-        with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+        with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
                 if not text:

@@ -22,10 +22,10 @@ def format_date(date_str):
         return ""
 
 
-def extract_emirates_data(file_bytes):
+def extract_emirates_data(file_bytes, password=None):
     rows = []
 
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
         for page in pdf.pages:
             tables = page.extract_tables()
 

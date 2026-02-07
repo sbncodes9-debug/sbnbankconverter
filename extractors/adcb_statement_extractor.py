@@ -43,10 +43,10 @@ def to_number(text):
         return 0.0
 
 
-def extract_adcb1_format(file_bytes):
+def extract_adcb1_format(file_bytes, password=None):
     """Extract ADCB1 format (dd/mm/yyyy, text-based Arabic format)"""
     rows = []
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
         for page in pdf.pages:
             lines = page.extract_text().split("\n")
             current = None
@@ -192,11 +192,11 @@ def extract_adcb1_format(file_bytes):
     return rows
 
 
-def extract_adcb2_format(file_bytes):
+def extract_adcb2_format(file_bytes, password=None):
     """Extract ADCB2 format (dd-mmm-yyyy, table-based)"""
     rows = []
 
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
         for page in pdf.pages:
             tables = page.extract_tables()
             
@@ -311,13 +311,13 @@ def extract_adcb2_format(file_bytes):
     return rows
 
 
-def extract_adcb_current_format(file_bytes):
+def extract_adcb_current_format(file_bytes, password=None):
     """Extract current ADCB format (dd-mmm-yyyy, text-based with OCR)"""
     rows = []
 
     try:
         # First try normal PDF text extraction
-        with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+        with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
             full_text = ""
             for page in pdf.pages:
                 txt = page.extract_text()
@@ -408,11 +408,11 @@ def extract_adcb_current_format(file_bytes):
     return rows
 
 
-def extract_adcb3_format(file_bytes):
+def extract_adcb3_format(file_bytes, password=None):
     """Extract ADCB3 format (Account Statement with Posting Date, Value Date, Description, Ref/Cheque No, Debit, Credit, Balance)"""
     rows = []
 
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
         for page in pdf.pages:
             # Use text extraction with column positions
             text = page.extract_text()
@@ -559,11 +559,11 @@ def extract_adcb3_format(file_bytes):
     return rows
 
 
-def extract_adcb4_format(file_bytes):
+def extract_adcb4_format(file_bytes, password=None):
     """Extract ADCB4 format (Account Statement with Posting Date+Time, table-based with proper column mapping)"""
     rows = []
 
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
         for page in pdf.pages:
             tables = page.extract_tables()
             
@@ -645,10 +645,10 @@ def extract_adcb4_format(file_bytes):
     return rows
 
 
-def detect_adcb_format(file_bytes):
+def detect_adcb_format(file_bytes, password=None):
     """Detect which ADCB format is being used"""
     try:
-        with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+        with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
             first_page_text = pdf.pages[0].extract_text() if pdf.pages else ""
             first_page_upper = first_page_text.upper()
             
@@ -711,46 +711,46 @@ def detect_adcb_format(file_bytes):
         return "adcb2"
 
 
-def extract_adcb_statement_data(file_bytes):
+def extract_adcb_statement_data(file_bytes, password=None):
     """
     Unified ADCB Statement extractor that handles all five formats
     """
     # Detect format
-    format_type = detect_adcb_format(file_bytes)
+    format_type = detect_adcb_format(file_bytes, password)
     print(f"Detected ADCB format: {format_type}")
     
     rows = []
     
     # Try the detected format first
     if format_type == "adcb1":
-        rows = extract_adcb1_format(file_bytes)
+        rows = extract_adcb1_format(file_bytes, password)
     elif format_type == "adcb2":
-        rows = extract_adcb2_format(file_bytes)
+        rows = extract_adcb2_format(file_bytes, password)
     elif format_type == "adcb3":
-        rows = extract_adcb3_format(file_bytes)
+        rows = extract_adcb3_format(file_bytes, password)
     elif format_type == "adcb4":
-        rows = extract_adcb4_format(file_bytes)
+        rows = extract_adcb4_format(file_bytes, password)
     else:  # current format
-        rows = extract_adcb_current_format(file_bytes)
+        rows = extract_adcb_current_format(file_bytes, password)
     
     # If no results, try other formats as fallback
     if not rows:
         print(f"No results with {format_type} format, trying other formats...")
         
         if format_type != "adcb4":
-            rows = extract_adcb4_format(file_bytes)
+            rows = extract_adcb4_format(file_bytes, password)
         
         if not rows and format_type != "adcb3":
-            rows = extract_adcb3_format(file_bytes)
+            rows = extract_adcb3_format(file_bytes, password)
         
         if not rows and format_type != "adcb1":
-            rows = extract_adcb1_format(file_bytes)
+            rows = extract_adcb1_format(file_bytes, password)
         
         if not rows and format_type != "adcb2":
-            rows = extract_adcb2_format(file_bytes)
+            rows = extract_adcb2_format(file_bytes, password)
         
         if not rows and format_type != "current":
-            rows = extract_adcb_current_format(file_bytes)
+            rows = extract_adcb_current_format(file_bytes, password)
     
     print(f"Extracted {len(rows)} transactions")
     

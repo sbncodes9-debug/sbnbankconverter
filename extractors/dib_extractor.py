@@ -38,10 +38,10 @@ def to_number(text):
         return 0.0
 
 
-def extract_dib_data(file_bytes):
+def extract_dib_data(file_bytes, password=None):
     rows = []
 
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
         for page in pdf.pages:
 
             words = page.extract_words(use_text_flow=True, keep_blank_chars=True)

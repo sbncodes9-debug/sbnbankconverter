@@ -12,10 +12,10 @@ def parse_date(text):
         return ""
 
 
-def extract_adcb_cc_data(file_bytes):
+def extract_adcb_cc_data(file_bytes, password=None):
     rows = []
 
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
 
         current = None
         desc_buffer = []

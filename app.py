@@ -18,6 +18,7 @@ from extractors.uab_extractor import extract_uab_data
 from extractors.excel_extractor import extract_excel_data
 from extractors.adcb_statement_extractor import extract_adcb_statement_data
 from extractors.emirates_islamic_extractor import extract_emirates_islamic_data
+from extractors.baroda_extractor import extract_baroda_data
 
 
 
@@ -37,13 +38,29 @@ def home():
 # -------------------------------------------------------------------
 def process_bank(request, extractor_func, download_filename):
     file = request.files["pdf"]
-    df = extractor_func(file.read())
-
-    output = BytesIO()
-    df.to_excel(output, index=False)
-    output.seek(0)
-
-    return send_file(output, download_name=download_filename, as_attachment=True)
+    password = request.form.get("password", "")  # Get password from form, default to empty string
+    
+    try:
+        # Pass password to extractor function
+        df = extractor_func(file.read(), password if password else None)
+        
+        output = BytesIO()
+        df.to_excel(output, index=False)
+        output.seek(0)
+        
+        return send_file(output, download_name=download_filename, as_attachment=True)
+    
+    except Exception as e:
+        # Handle password-related errors
+        error_msg = str(e).lower()
+        if "password" in error_msg or "encrypted" in error_msg or "locked" in error_msg:
+            return render_template("error.html", 
+                                 error_message="PDF is password-protected. Please provide the correct password.",
+                                 back_url=request.url), 400
+        else:
+            return render_template("error.html", 
+                                 error_message=f"Error processing PDF: {str(e)}",
+                                 back_url=request.url), 500
 
 
 # -------------------------------------------------------------------
@@ -186,6 +203,17 @@ def emirates_islamic():
     return render_template("bank.html", bank_name="Emirates Islamic Bank")
 
 
+@app.route("/baroda", methods=["GET", "POST"])
+def baroda():
+    if request.method == "POST":
+        return process_bank(
+            request,
+            extract_baroda_data,
+            "baroda_statement.xlsx"
+        )
+    return render_template("bank.html", bank_name="Bank of Baroda")
+
+
 @app.route("/excel", methods=["GET", "POST"])
 def excel():
     if request.method == "POST":
@@ -198,13 +226,29 @@ def excel():
 # -------------------------------------------------------------------
 def process_excel(request):
     file = request.files["excel"]
-    df = extract_excel_data(file.read())
-
-    output = BytesIO()
-    df.to_excel(output, index=False)
-    output.seek(0)
-
-    return send_file(output, download_name="converted_excel_statement.xlsx", as_attachment=True)
+    password = request.form.get("password", "")  # Get password from form, default to empty string
+    
+    try:
+        # Pass password to extractor function
+        df = extract_excel_data(file.read(), password if password else None)
+        
+        output = BytesIO()
+        df.to_excel(output, index=False)
+        output.seek(0)
+        
+        return send_file(output, download_name="converted_excel_statement.xlsx", as_attachment=True)
+    
+    except Exception as e:
+        # Handle password-related errors
+        error_msg = str(e).lower()
+        if "password" in error_msg or "encrypted" in error_msg or "locked" in error_msg:
+            return render_template("error.html", 
+                                 error_message="Excel file is password-protected. Please provide the correct password.",
+                                 back_url="/excel"), 400
+        else:
+            return render_template("error.html", 
+                                 error_message=f"Error processing Excel file: {str(e)}",
+                                 back_url="/excel"), 500
 
 
 # -------------------------------------------------------------------

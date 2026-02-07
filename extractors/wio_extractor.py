@@ -23,10 +23,10 @@ def format_date(d):
         return ""
 
 
-def extract_wio_data(file_bytes):
+def extract_wio_data(file_bytes, password=None):
     rows = []
 
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
         lines = []
         for p in pdf.pages:
             text = p.extract_text()

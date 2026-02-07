@@ -17,6 +17,14 @@
 
     <form id="uploadForm" method="post" enctype="multipart/form-data">
         <input type="file" id="fileInput" name="excel" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" required hidden>
+        
+        <!-- Password field for locked Excel files -->
+        <div class="password-field" id="passwordField" style="display: none;">
+            <label for="excelPassword">Excel Password (if locked):</label>
+            <input type="password" id="excelPassword" name="password" placeholder="Enter Excel password">
+            <small>Leave empty if Excel file is not password-protected</small>
+        </div>
+        
         <button type="submit" class="btn upload-btn">Convert</button>
     </form>
 </div>
@@ -147,6 +155,39 @@
     margin: 8px 0;
     color: #555;
 }
+
+.password-field {
+    margin: 20px 0;
+    text-align: left;
+}
+
+.password-field label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #333;
+}
+
+.password-field input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+.password-field input:focus {
+    outline: none;
+    border-color: #00d4ff;
+}
+
+.password-field small {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 14px;
+}
 </style>
 
 <script>
@@ -195,9 +236,21 @@ document.querySelector(".upload-btn").addEventListener("click", (e) => {
     e.stopPropagation();
 });
 
+// STOP the password field from triggering the dropzone click
+document.addEventListener("DOMContentLoaded", () => {
+    const passwordField = document.getElementById("passwordField");
+    if (passwordField) {
+        passwordField.addEventListener("click", (e) => {
+            e.stopPropagation();
+        });
+    }
+});
+
 fileInput.addEventListener("change", () => {
     if (fileInput.files.length > 0) {
         fileNameEl.textContent = "Selected: " + fileInput.files[0].name;
+        // Show password field when file is selected
+        document.getElementById("passwordField").style.display = "block";
     }
 });
 
@@ -226,6 +279,8 @@ dropzone.addEventListener("drop", (e) => {
                  file.name.endsWith('.csv'))) {
         fileInput.files = e.dataTransfer.files;
         fileNameEl.textContent = "Selected: " + file.name;
+        // Show password field when file is dropped
+        document.getElementById("passwordField").style.display = "block";
     } else {
         alert("Please upload an Excel or CSV file (.xlsx, .xls, or .csv)");
     }

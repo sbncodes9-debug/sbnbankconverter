@@ -41,7 +41,7 @@ def to_number(text):
         return 0.0
 
 
-def extract_pluto_data(file_bytes):
+def extract_pluto_data(file_bytes, password=None):
     """
     Pluto Bank Statement extractor with text-first approach
     Format: Posting Date | Transaction Date | Type | Merchant | User/Last4 | Amount (AED) | Balance (AED)
@@ -50,7 +50,7 @@ def extract_pluto_data(file_bytes):
 
     try:
         # Use text extraction as primary method for Pluto statements
-        with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+        with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
             print(f"Processing {len(pdf.pages)} pages...")
             for page_num, page in enumerate(pdf.pages, 1):
                 print(f"Processing page {page_num}...")

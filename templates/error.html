@@ -1,27 +1,16 @@
 {% extends "base.html" %}
+
 {% block content %}
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
 
-<h1 class="title">UAE Bank Statement Converter</h1>
-
-<div class="button-grid">
-    <a class="btn" href="/emirates">Emirates NBD Bank</a>
-    <a class="btn" href="/emirates_islamic">Emirates Islamic Bank</a>
-    <a class="btn" href="/wio">Wio Bank</a>
-    <a class="btn" href="/rakbank">RAK Bank</a>
-    <a class="btn" href="/rakbank_cc">RAK Bank Credit Card</a>
-    <a class="btn" href="/pluto">Pluto Bank</a>
-    <a class="btn" href="/dib">DIB Bank</a>
-    <a class="btn" href="/misr">MISR Bank</a>
-    <a class="btn" href="/mashreq">Mashreq Bank</a>
-    <a class="btn" href="/adcb_statement">ADCB Bank</a>
-    <a class="btn" href="/adcb_cc">ADCB Credit Card</a>
-    <a class="btn" href="/emirates2">Emirates NBD Format 2</a>
-    <a class="btn" href="/mashreq2">Mashreq Bank Format 2</a>
-    <a class="btn" href="/uab">United Arab Bank (UAB)</a>
-    <a class="btn" href="/baroda">Bank of Baroda</a>
-    <a class="btn excel-btn" href="/excel">📊 Excel Sheet</a>
-    <a class="btn" href="/otherbanks">Other Banks</a>
+<div class="error-container">
+    <div class="error-icon">⚠️</div>
+    <h2 class="error-title">Processing Error</h2>
+    <p class="error-message">{{ error_message }}</p>
+    
+    <div class="error-actions">
+        <a href="{{ back_url }}" class="btn retry-btn">Try Again</a>
+        <a href="/" class="btn home-btn">Back to Home</a>
+    </div>
 </div>
 
 <!-- WhatsApp Query Button -->
@@ -34,9 +23,76 @@
     </a>
 </div>
 
-<div class="fire-bg">SBN</div>
-
 <style>
+.error-container {
+    text-align: center;
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 40px 20px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.error-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+}
+
+.error-title {
+    color: #e74c3c;
+    margin-bottom: 20px;
+    font-size: 28px;
+}
+
+.error-message {
+    color: #555;
+    font-size: 18px;
+    line-height: 1.6;
+    margin-bottom: 30px;
+}
+
+.error-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.retry-btn {
+    background: #00d4ff;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.retry-btn:hover {
+    background: #00b8e6;
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+}
+
+.home-btn {
+    background: #6c757d;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.home-btn:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+}
+
 .whatsapp-container {
     position: fixed;
     bottom: 30px;
@@ -70,16 +126,6 @@
 .whatsapp-icon {
     width: 24px;
     height: 24px;
-}
-
-.excel-btn {
-    background: linear-gradient(135deg, #1e7e34, #28a745) !important;
-    border: 2px solid #1e7e34 !important;
-}
-
-.excel-btn:hover {
-    background: linear-gradient(135deg, #155724, #1e7e34) !important;
-    transform: translateY(-3px);
 }
 </style>
 

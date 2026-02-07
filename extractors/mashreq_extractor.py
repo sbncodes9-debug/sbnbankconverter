@@ -23,10 +23,10 @@ def to_number(text):
     except:
         return 0.0
 
-def extract_mashreq_data(file_bytes):
+def extract_mashreq_data(file_bytes, password=None):
     rows = []
 
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
         for page in pdf.pages:
             # Try table extraction first (most reliable)
             tables = page.extract_tables()

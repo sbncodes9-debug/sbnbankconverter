@@ -16,6 +16,14 @@
 
     <form id="uploadForm" method="post" enctype="multipart/form-data">
         <input type="file" id="fileInput" name="pdf" accept="application/pdf" required hidden>
+        
+        <!-- Password field for locked PDFs -->
+        <div class="password-field" id="passwordField" style="display: none;">
+            <label for="pdfPassword">PDF Password (if locked):</label>
+            <input type="password" id="pdfPassword" name="password" placeholder="Enter PDF password">
+            <small>Leave empty if PDF is not password-protected</small>
+        </div>
+        
         <button type="submit" class="btn upload-btn">Convert</button>
     </form>
 </div>
@@ -104,6 +112,39 @@
     width: 24px;
     height: 24px;
 }
+
+.password-field {
+    margin: 20px 0;
+    text-align: left;
+}
+
+.password-field label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #333;
+}
+
+.password-field input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+.password-field input:focus {
+    outline: none;
+    border-color: #00d4ff;
+}
+
+.password-field small {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 14px;
+}
 </style>
 
 <script>
@@ -152,9 +193,21 @@ document.querySelector(".upload-btn").addEventListener("click", (e) => {
     e.stopPropagation();
 });
 
+// STOP the password field from triggering the dropzone click
+document.addEventListener("DOMContentLoaded", () => {
+    const passwordField = document.getElementById("passwordField");
+    if (passwordField) {
+        passwordField.addEventListener("click", (e) => {
+            e.stopPropagation();
+        });
+    }
+});
+
 fileInput.addEventListener("change", () => {
     if (fileInput.files.length > 0) {
         fileNameEl.textContent = "Selected: " + fileInput.files[0].name;
+        // Show password field when file is selected
+        document.getElementById("passwordField").style.display = "block";
     }
 });
 
@@ -178,6 +231,8 @@ dropzone.addEventListener("drop", (e) => {
     if (file && file.type === "application/pdf") {
         fileInput.files = e.dataTransfer.files;
         fileNameEl.textContent = "Selected: " + file.name;
+        // Show password field when file is dropped
+        document.getElementById("passwordField").style.display = "block";
     } else {
         alert("Please upload a PDF file");
     }

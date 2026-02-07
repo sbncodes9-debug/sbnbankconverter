@@ -99,7 +99,7 @@ def to_number(text):
         return 0.0
 
 
-def extract_excel_data(file_bytes):
+def extract_excel_data(file_bytes, password=None):
     """
     Extract data from Excel or CSV file and convert to standard format
     Supports multiple formats:
@@ -134,7 +134,22 @@ def extract_excel_data(file_bytes):
                     raise Exception("Not a valid CSV")
             except:
                 # If CSV fails, try Excel
-                df = pd.read_excel(BytesIO(file_bytes), sheet_name=0, header=None)
+                if password:
+                    # For password-protected Excel files, we need to use openpyxl engine
+                    try:
+                        import openpyxl
+                        # Load workbook with password
+                        wb = openpyxl.load_workbook(BytesIO(file_bytes), password=password)
+                        # Convert first sheet to DataFrame
+                        ws = wb.active
+                        data = []
+                        for row in ws.iter_rows(values_only=True):
+                            data.append(row)
+                        df = pd.DataFrame(data)
+                    except Exception as e:
+                        raise Exception(f"Failed to open password-protected Excel file: {str(e)}")
+                else:
+                    df = pd.read_excel(BytesIO(file_bytes), sheet_name=0, header=None)
                 print("File detected as Excel")
         
         print(f"File loaded. Shape: {df.shape}")

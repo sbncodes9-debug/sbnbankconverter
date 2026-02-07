@@ -34,7 +34,7 @@ def to_number(text):
         return 0.0
 
 
-def extract_emirates_islamic_data(file_bytes):
+def extract_emirates_islamic_data(file_bytes, password=None):
     """
     Emirates Islamic Bank extractor - uses visual line separators
     Format: Multi-line descriptions above date, separated by horizontal lines
@@ -44,7 +44,7 @@ def extract_emirates_islamic_data(file_bytes):
 
     try:
         # First try normal PDF text extraction
-        with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+        with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
             for page in pdf.pages:
                 # Try table extraction first to get structured data
                 tables = page.extract_tables()

@@ -41,13 +41,13 @@ def to_number(text: str) -> float:
         return 0.0
 
 
-def extract_rakbank_data(file_bytes):
+def extract_rakbank_data(file_bytes, password=None):
     """
     Column-position extractor with improved description capture
     """
     rows = []
 
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    with pdfplumber.open(BytesIO(file_bytes), password=password) as pdf:
         for page in pdf.pages:
             # Extract horizontal lines for transaction boundaries
             lines = page.lines
